@@ -87,6 +87,8 @@ public struct ProcessSnapshot: Sendable, Equatable, Identifiable {
     public var residentBytes: UInt64
     public var state: String
     public var elapsedSeconds: Int?
+    /// `ps lstart`가 제공한 프로세스 시작 시각 문자열. PID 재사용 방지용 불변 식별값이다.
+    public var startTimeIdentifier: String?
     public var command: String
 
     public var id: Int32 { pid }
@@ -100,6 +102,7 @@ public struct ProcessSnapshot: Sendable, Equatable, Identifiable {
         residentBytes: UInt64,
         state: String,
         elapsedSeconds: Int?,
+        startTimeIdentifier: String? = nil,
         command: String
     ) {
         self.pid = pid
@@ -110,6 +113,7 @@ public struct ProcessSnapshot: Sendable, Equatable, Identifiable {
         self.residentBytes = residentBytes
         self.state = state
         self.elapsedSeconds = elapsedSeconds
+        self.startTimeIdentifier = startTimeIdentifier
         self.command = command
     }
 }

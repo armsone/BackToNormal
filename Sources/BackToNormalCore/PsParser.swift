@@ -1,11 +1,11 @@
 import Foundation
 
-/// `ps -xo pid=,ppid=,user=,pcpu=,pmem=,rss=,state=,etime=,command=` 출력을 파싱한다.
+/// `ps -xo pid=,ppid=,user=,pcpu=,pmem=,rss=,state=,etime=,lstart=,command=` 출력을 파싱한다.
 /// 읽기 전용 명령의 텍스트 출력만 다루며 시스템 상태를 바꾸지 않는다.
 public enum PsParser {
 
-    /// ps에 넘길 출력 형식. 마지막 필드(command)만 공백을 포함할 수 있다.
-    public static let outputFormat = "pid=,ppid=,user=,pcpu=,pmem=,rss=,state=,etime=,command="
+    /// lstart는 고정 5개 토큰이며 마지막 필드(command)는 공백을 포함할 수 있다.
+    public static let outputFormat = "pid=,ppid=,user=,pcpu=,pmem=,rss=,state=,etime=,lstart=,command="
 
     public static func parse(_ output: String) -> [ProcessSnapshot] {
         output
@@ -17,8 +17,8 @@ public enum PsParser {
     public static func parseLine(_ line: String) -> ProcessSnapshot? {
         let fields = line
             .trimmingCharacters(in: .whitespaces)
-            .split(separator: " ", maxSplits: 8, omittingEmptySubsequences: true)
-        guard fields.count == 9 else { return nil }
+            .split(separator: " ", maxSplits: 13, omittingEmptySubsequences: true)
+        guard fields.count == 14 else { return nil }
 
         guard
             let pid = Int32(fields[0]),
@@ -37,7 +37,8 @@ public enum PsParser {
             residentBytes: rssKB * 1024,
             state: String(fields[6]),
             elapsedSeconds: parseElapsedTime(String(fields[7])),
-            command: String(fields[8])
+            startTimeIdentifier: fields[8...12].joined(separator: " "),
+            command: String(fields[13])
         )
     }
 
