@@ -15,13 +15,17 @@
 - 상세 창(측정값·진단·프로세스 목록)과 수동 새로고침, 30초 자동 새로고침
 - 사용 불가 또는 종료된 테스트 복제 시뮬레이터를 개별 선택해 `simctl`로 삭제
 - 24시간 이상 수정되지 않은 개별 DerivedData 프로젝트와 7일 이상 된 종료 상태 XCTest 기기 데이터를 휴지통으로 이동
+- 30분 이상 launchd에 재부착되어 있고 CPU 1% 이하·상주 메모리 64 MiB 이상인 명확한
+  Gradle/Kotlin 데몬·테스트 러너·브라우저 자동화·로컬 개발 서버를 메모리 정리 후보로 제안
+- 사용자가 선택한 프로세스는 실행 직전 소유자·PID·PPID·명령줄·경과 시간·자원 상태를 다시 확인하고
+  정확한 PID 하나에만 `SIGTERM` 요청
 - 모든 정리 후보 기본 미선택, 최종 확인, 항목별 실행 직전 재검증과 결과 기록
 
 ## 무엇을 하지 않나 (안전 경계)
 
-- 사용자가 실행한 프로세스를 종료하지 않습니다. 앱이 시작한 읽기 전용 `ps`·`du`가
-  비정상적으로 멈춘 경우에만 제한 시간 뒤 그 자식 도구를 종료합니다
-- 포트를 닫거나 Gradle·Node·Xcode 프로세스를 종료하지 않습니다
+- 일반 Java·Node, Xcode, 시뮬레이터·에뮬레이터, ADB와 시스템 프로세스는 종료 후보로 만들지 않습니다
+- 메모리 후보는 자동 선택하거나 자동 종료하지 않으며, `SIGKILL`·프로세스 그룹 종료·광범위한 데몬 중지 명령을 사용하지 않습니다
+- 포트 자체를 닫지 않습니다
 - 정리 후보는 자동 선택하거나 자동 실행하지 않습니다
 - DerivedData와 XCTest 데이터는 영구 삭제하지 않고 휴지통으로만 이동합니다
 - 시뮬레이터 삭제는 복구 불가임을 확인 화면에 표시하며, 종료 상태를 다시 확인한 뒤 개별 UDID만 삭제합니다
@@ -34,7 +38,7 @@
 
 ## 설치
 
-GitHub Releases에서 공증된 `BackToNormal-1.1.0.dmg`를 받아 열고, 앱을 Applications로
+GitHub Releases에서 공증된 `BackToNormal-1.2.0.dmg`를 받아 열고, 앱을 Applications로
 드래그합니다. 앱을 실행하면 Dock 대신 메뉴 막대에 원상복구 아이콘이 나타납니다.
 
 ## 개발 빌드와 실행
@@ -72,6 +76,7 @@ Sources/BackToNormalCore/   # 순수 로직 (UI·시스템 호출 없음, 단위
   Models.swift              #   상태·지표·프로세스 모델
   PsParser.swift            #   ps 출력 파싱 (etime 포함)
   ProcessClassifier.swift   #   개발 프로세스 분류 규칙
+  ProcessCleanupPolicy.swift #  메모리 정리 후보·재검증 규칙
   DiagnosticEngine.swift    #   결정적 진단 규칙 (임계값 고정)
 Sources/BackToNormal/       # 앱 타깃
   MetricsCollector.swift    #   getloadavg · sysctl · Mach host 통계 (읽기 전용)
@@ -79,6 +84,7 @@ Sources/BackToNormal/       # 앱 타깃
   StorageCollector.swift    #   디스크·시뮬레이터·DerivedData 용량 읽기(10분 캐시)
   CleanupEvidenceCollector.swift # 정리 후보 근거 수집
   CleanupExecutor.swift     #   재검증 후 simctl 삭제 또는 휴지통 이동
+  ProcessCleanupExecutor.swift # 재검증 후 정확한 PID 하나에 SIGTERM 요청
   MonitorViewModel.swift    #   수집→진단→화면 연결, 자동 새로고침
   BackToNormalApp.swift     #   MenuBarExtra + 상세 Window
   MenuContentView.swift / DetailView.swift

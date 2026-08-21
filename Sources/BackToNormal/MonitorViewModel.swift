@@ -13,6 +13,9 @@ final class MonitorViewModel: ObservableObject {
     @Published private(set) var cleanupCandidates: [CleanupCandidate] = []
     @Published var selectedCleanupIDs: Set<String> = []
     @Published private(set) var cleanupResults: [CleanupExecutionResult] = []
+    @Published private(set) var processCleanupCandidates: [ProcessCleanupCandidate] = []
+    @Published var selectedProcessCleanupIDs: Set<String> = []
+    @Published private(set) var processCleanupResults: [ProcessCleanupExecutionResult] = []
     @Published private(set) var isScanningCleanup = false
     @Published private(set) var isCleaning = false
     @Published var isShowingCleanupConfirmation = false
@@ -64,16 +67,29 @@ final class MonitorViewModel: ObservableObject {
         guard !isScanningCleanup, !isCleaning else { return }
         isScanningCleanup = true
         cleanupResults = []
+        processCleanupResults = []
         Task.detached(priority: .utility) {
             let input = CleanupEvidenceCollector.collect()
             let candidates = CleanupPolicy.propose(input)
+            let processCandidates = ProcessCleanupPolicy.propose(Self.processCleanupInput())
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.cleanupCandidates = candidates
-                self.selectedCleanupIDs.formIntersection(Set(candidates.map(\.id)))
+                // 새 스캔 결과는 디스크와 프로세스 모두 안전하게 기본 미선택으로 시작한다.
+                self.selectedCleanupIDs.removeAll()
+                self.processCleanupCandidates = processCandidates
+                self.selectedProcessCleanupIDs.removeAll()
                 self.isScanningCleanup = false
             }
         }
+    }
+
+    nonisolated static func processCleanupInput() -> ProcessCleanupPolicyInput {
+        ProcessCleanupPolicyInput(
+            processes: ProcessCollector.collectOptional(),
+            currentUserName: NSUserName(),
+            ownPid: ProcessInfo.processInfo.processIdentifier
+        )
     }
 
     func toggleCleanupCandidate(_ candidate: CleanupCandidate) {
@@ -84,26 +100,40 @@ final class MonitorViewModel: ObservableObject {
         }
     }
 
+    func toggleProcessCleanupCandidate(_ candidate: ProcessCleanupCandidate) {
+        if selectedProcessCleanupIDs.contains(candidate.id) {
+            selectedProcessCleanupIDs.remove(candidate.id)
+        } else {
+            selectedProcessCleanupIDs.insert(candidate.id)
+        }
+    }
+
     func requestCleanupConfirmation() {
-        guard !selectedCandidates.isEmpty else { return }
+        guard !selectedCandidates.isEmpty || !selectedProcessCandidates.isEmpty else { return }
         isShowingCleanupConfirmation = true
     }
 
     func executeSelectedCleanup() {
         let targets = selectedCandidates
-        guard !targets.isEmpty, !isCleaning else { return }
+        let processTargets = selectedProcessCandidates
+        guard !targets.isEmpty || !processTargets.isEmpty, !isCleaning else { return }
         isShowingCleanupConfirmation = false
         isCleaning = true
 
         Task.detached(priority: .utility) {
             let results = targets.map(CleanupExecutor.execute)
+            let processResults = processTargets.map(ProcessCleanupExecutor.execute)
             let refreshedInput = CleanupEvidenceCollector.collect()
             let refreshedCandidates = CleanupPolicy.propose(refreshedInput)
+            let refreshedProcessCandidates = ProcessCleanupPolicy.propose(Self.processCleanupInput())
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.cleanupResults = results
+                self.processCleanupResults = processResults
                 self.cleanupCandidates = refreshedCandidates
+                self.processCleanupCandidates = refreshedProcessCandidates
                 self.selectedCleanupIDs.removeAll()
+                self.selectedProcessCleanupIDs.removeAll()
                 self.isCleaning = false
                 self.lastStorageScan = nil
                 self.refresh()
@@ -115,8 +145,18 @@ final class MonitorViewModel: ObservableObject {
         cleanupCandidates.filter { selectedCleanupIDs.contains($0.id) }
     }
 
+    var selectedProcessCandidates: [ProcessCleanupCandidate] {
+        processCleanupCandidates.filter { selectedProcessCleanupIDs.contains($0.id) }
+    }
+
+    /// 선택된 디스크 후보의 예상 확보 공간. 메모리 예상치와 절대 합산하지 않는다.
     var selectedCleanupBytes: UInt64 {
         selectedCandidates.reduce(0) { $0 + $1.estimatedBytes }
+    }
+
+    /// 선택된 프로세스 후보의 상주 메모리 합계. 디스크 예상치와 별도로만 표시한다.
+    var selectedProcessMemoryBytes: UInt64 {
+        ProcessCleanupPolicy.totalExpectedResidentBytes(of: selectedProcessCandidates)
     }
 
     var statusSymbolName: String {

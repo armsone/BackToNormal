@@ -159,7 +159,10 @@ public enum DiagnosticEngine {
             )
         }
 
-        lines.append("이 앱은 관찰만 하며 어떤 프로세스도 종료하지 않습니다.")
+        lines.append(
+            "진단만으로는 아무것도 종료하지 않습니다. 엄격한 조건의 후보를 사용자가 선택하고 "
+            + "실행 직전 다시 확인한 경우에만 정상 종료(SIGTERM)를 요청합니다. 스왑 자체는 조작하지 않습니다."
+        )
         return lines.joined(separator: "\n")
     }
 
