@@ -14,7 +14,7 @@ enum CleanupEvidenceCollector {
         for kind: CleanupCandidateKind? = nil,
         measureSizes: Bool = true
     ) -> CleanupPolicyInput {
-        let needsSimulator = kind == nil || kind == .unavailableSimulatorDevice || kind == .ephemeralCloneSimulatorDevice
+        let needsSimulator = kind == nil || kind?.targetsSimulator == true
         let needsDerivedData = kind == nil || kind == .derivedDataProject
         let needsXCTest = kind == nil || kind == .xctestDeviceDirectory
 
@@ -27,9 +27,12 @@ enum CleanupEvidenceCollector {
             now: Date()
         )
 
-        // 크기는 안전 조건이 아니다. 정책을 먼저 적용한 뒤 표시할 후보만 제한적으로 측정한다.
+        // 파일 후보의 크기는 표시용이므로 정책 적용 후 필요한 경로만 제한적으로 측정한다.
+        // 시뮬레이터 후보의 크기 조건은 simctl의 dataPathSize로 판정하므로 du로 다시 재지 않는다.
         guard measureSizes else { return input }
-        let paths = Set(CleanupPolicy.propose(input).compactMap(\.targetPath))
+        let paths = Set(CleanupPolicy.propose(input).compactMap { candidate in
+            candidate.kind.targetsSimulator ? nil : candidate.targetPath
+        })
         guard !paths.isEmpty else { return input }
         let sizes = Dictionary(uniqueKeysWithValues: paths.map { ($0, directoryBytes(atPath: $0)) })
         input.derivedDataEntries = input.derivedDataEntries.map { entries in

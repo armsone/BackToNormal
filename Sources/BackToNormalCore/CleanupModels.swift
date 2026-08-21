@@ -43,7 +43,7 @@ public struct SimulatorDevice: Sendable, Equatable, Identifiable {
     public var isAvailable: Bool?
     /// simctl이 보고한 데이터 디렉터리 경로. 없을 수 있다.
     public var dataPath: String?
-    /// 수집기가 별도로 측정한 데이터 크기. 없으면 0으로 보수적으로 추정한다.
+    /// simctl이 보고한 데이터 디렉터리 크기. 없으면 확인 불가로 취급한다.
     public var dataSizeBytes: UInt64?
 
     public var id: UUID { udid }
@@ -124,6 +124,8 @@ public struct FilesystemCandidateEvidence: Sendable, Equatable {
 public enum CleanupCandidateKind: String, Sendable, Equatable, CaseIterable {
     case unavailableSimulatorDevice
     case ephemeralCloneSimulatorDevice
+    /// 기기는 남기고 내부 앱·콘텐츠 데이터만 지우는 초기화 (simctl erase).
+    case simulatorDataErase
     case derivedDataProject
     case xctestDeviceDirectory
 
@@ -131,8 +133,19 @@ public enum CleanupCandidateKind: String, Sendable, Equatable, CaseIterable {
         switch self {
         case .unavailableSimulatorDevice: return "사용 불가 시뮬레이터"
         case .ephemeralCloneSimulatorDevice: return "테스트용 임시 시뮬레이터"
+        case .simulatorDataErase: return "시뮬레이터 데이터 초기화"
         case .derivedDataProject: return "DerivedData 프로젝트"
         case .xctestDeviceDirectory: return "XCTest 기기 데이터"
+        }
+    }
+
+    /// 시뮬레이터를 대상으로 하는 비가역 정리 종류. 자동 정리 후 최종 확인 단계로만 실행된다.
+    public var targetsSimulator: Bool {
+        switch self {
+        case .unavailableSimulatorDevice, .ephemeralCloneSimulatorDevice, .simulatorDataErase:
+            return true
+        case .derivedDataProject, .xctestDeviceDirectory:
+            return false
         }
     }
 }
@@ -222,6 +235,37 @@ public struct CleanupCandidate: Sendable, Equatable, Identifiable {
         self.isRecoverable = isRecoverable
         self.recoveryMethod = recoveryMethod
         self.filesystemObjectIdentifier = filesystemObjectIdentifier
+    }
+}
+
+/// 무확인 자동 정리에 사용할 수 있는 파일 후보 계획.
+/// 복구 불가능하거나 위험도가 올라간 항목은 새 종류가 추가돼도 자동으로 제외한다.
+public struct AutomaticCleanupPlan: Sendable, Equatable {
+    public var targets: [CleanupCandidate]
+    public var manualOnly: [CleanupCandidate]
+
+    public init(targets: [CleanupCandidate], manualOnly: [CleanupCandidate]) {
+        self.targets = targets
+        self.manualOnly = manualOnly
+    }
+}
+
+public enum AutomaticCleanupPolicy {
+    public static func isEligible(_ candidate: CleanupCandidate) -> Bool {
+        candidate.risk == .low
+            && candidate.isRecoverable
+            && candidate.recoveryMethod == .userTrash
+    }
+
+    public static func makePlan(
+        candidates: [CleanupCandidate],
+        protectedIdentifiers: Set<String>
+    ) -> AutomaticCleanupPlan {
+        let visible = candidates.filter { !protectedIdentifiers.contains($0.id) }
+        return AutomaticCleanupPlan(
+            targets: visible.filter(isEligible),
+            manualOnly: visible.filter { !isEligible($0) }
+        )
     }
 }
 

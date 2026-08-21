@@ -46,6 +46,17 @@ public struct ProcessCleanupCandidate: Sendable, Equatable, Identifiable {
     public var risk: CleanupRisk
     public var koreanReason: String
 
+    /// 현재 버전에서 실제 종료를 허용하는지 여부.
+    /// 로컬 서버는 사용자가 의도적으로 상시 실행했을 가능성이 높아 관찰만 한다.
+    public var isActionable: Bool { kind != .localServer }
+
+    /// PID는 재사용되고 명령 인수에는 비밀값이 포함될 수 있으므로 종류와 실행 파일만 저장한다.
+    /// 실행 파일 단위 보호는 일부 대상을 넓게 제외할 수 있지만, 안전 측면에서는 보수적인 방향이다.
+    public var protectionIdentifier: String {
+        let executable = command.split(whereSeparator: \.isWhitespace).first.map(String.init) ?? "unknown"
+        return "process:\(kind.rawValue):\(executable)"
+    }
+
     public init(
         id: String,
         kind: ProcessCleanupKind,

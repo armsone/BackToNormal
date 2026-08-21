@@ -21,5 +21,10 @@ let package = Package(
             dependencies: ["BackToNormalCore"],
             path: "Tests/BackToNormalCoreTests"
         ),
+        .testTarget(
+            name: "BackToNormalTests",
+            dependencies: ["BackToNormal"],
+            path: "Tests/BackToNormalTests"
+        ),
     ]
 )

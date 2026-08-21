@@ -87,6 +87,7 @@ final class ProcessCleanupPolicyTests: XCTestCase {
             let candidate = propose([snapshot(pid: Int32(700 + index), command: item.0)]).first
             XCTAssertEqual(candidate?.kind, item.1)
             XCTAssertEqual(candidate?.risk, item.2)
+            XCTAssertEqual(candidate?.isActionable, item.1 != .localServer)
         }
     }
 
@@ -143,6 +144,14 @@ final class ProcessCleanupPolicyTests: XCTestCase {
             ProcessCleanupPolicy.totalExpectedResidentBytes(of: [first, second]),
             UInt64.max
         )
+    }
+
+    func testProtectionIdentifierDoesNotDependOnReusablePID() {
+        let first = candidate(pid: 500, residentBytes: 128 * 1024 * 1024)
+        let second = candidate(pid: 999, residentBytes: 128 * 1024 * 1024)
+
+        XCTAssertEqual(first.protectionIdentifier, second.protectionIdentifier)
+        XCTAssertFalse(first.protectionIdentifier.contains(":500"))
     }
 
     private func propose(_ processes: [ProcessSnapshot]) -> [ProcessCleanupCandidate] {

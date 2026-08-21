@@ -118,7 +118,8 @@ final class CleanupPolicyTests: XCTestCase {
             devicePlistEvidence: [cloneEvidence(isEphemeral: nil, nameMarker: true)],
             now: now
         )
-        XCTAssertTrue(CleanupPolicy.propose(input).isEmpty)
+        // 이름 표식만으로는 clone 후보가 되지 않는다. 크기가 크므로 데이터 초기화 후보만 나온다.
+        XCTAssertEqual(CleanupPolicy.propose(input).map(\.kind), [.simulatorDataErase])
     }
 
     func testDeviceWithoutPlistEvidenceIsNeverACloneCandidate() {
@@ -128,7 +129,7 @@ final class CleanupPolicyTests: XCTestCase {
             devicePlistEvidence: [],
             now: now
         )
-        XCTAssertTrue(CleanupPolicy.propose(input).isEmpty)
+        XCTAssertEqual(CleanupPolicy.propose(input).map(\.kind), [.simulatorDataErase])
     }
 
     func testEvidenceWithMismatchedUDIDDoesNotApply() {
@@ -137,7 +138,7 @@ final class CleanupPolicyTests: XCTestCase {
             devicePlistEvidence: [cloneEvidence(udid: udidB)],
             now: now
         )
-        XCTAssertTrue(CleanupPolicy.propose(input).isEmpty)
+        XCTAssertEqual(CleanupPolicy.propose(input).map(\.kind), [.simulatorDataErase])
     }
 
     func testEvidenceWithoutCloneIndicatorsDoesNotApply() {
@@ -146,7 +147,7 @@ final class CleanupPolicyTests: XCTestCase {
             devicePlistEvidence: [cloneEvidence(isEphemeral: false, nameMarker: false)],
             now: now
         )
-        XCTAssertTrue(CleanupPolicy.propose(input).isEmpty)
+        XCTAssertEqual(CleanupPolicy.propose(input).map(\.kind), [.simulatorDataErase])
     }
 
     func testNonShutdownStatesAreNeverCloneCandidates() {
@@ -174,6 +175,93 @@ final class CleanupPolicyTests: XCTestCase {
             now: now
         )
         XCTAssertTrue(CleanupPolicy.propose(input).isEmpty)
+    }
+
+    // MARK: - 시뮬레이터 데이터 초기화
+
+    func testLargeShutdownAvailableSimulatorProposesDataErase() {
+        let input = CleanupPolicyInput(
+            simulatorDevices: [device(sizeBytes: 3 << 30)],
+            now: now
+        )
+        let candidates = CleanupPolicy.propose(input)
+
+        XCTAssertEqual(candidates.count, 1)
+        let candidate = candidates[0]
+        XCTAssertEqual(candidate.kind, .simulatorDataErase)
+        XCTAssertEqual(candidate.id, "sim-erase:\(udidA.uuidString.lowercased())")
+        XCTAssertEqual(candidate.targetIdentifier, udidA.uuidString)
+        XCTAssertEqual(candidate.estimatedBytes, 3 << 30)
+        XCTAssertEqual(candidate.risk, .medium)
+        XCTAssertFalse(candidate.isRecoverable)
+        XCTAssertEqual(candidate.recoveryMethod, .recreatable)
+        XCTAssertFalse(candidate.koreanReason.isEmpty)
+    }
+
+    func testSimulatorAtExactSizeThresholdIsProposedForErase() {
+        let input = CleanupPolicyInput(
+            simulatorDevices: [device(sizeBytes: CleanupPolicy.simulatorDataEraseMinimumBytes)],
+            now: now
+        )
+        XCTAssertEqual(CleanupPolicy.propose(input).map(\.kind), [.simulatorDataErase])
+    }
+
+    func testSimulatorBelowSizeThresholdIsNotProposedForErase() {
+        let input = CleanupPolicyInput(
+            simulatorDevices: [device(sizeBytes: CleanupPolicy.simulatorDataEraseMinimumBytes - 1)],
+            now: now
+        )
+        XCTAssertTrue(CleanupPolicy.propose(input).isEmpty)
+    }
+
+    func testSimulatorWithUnknownSizeIsNotProposedForErase() {
+        // 측정값 없음 → 크기 조건 미충족 → fail closed.
+        let input = CleanupPolicyInput(
+            simulatorDevices: [device(sizeBytes: nil)],
+            now: now
+        )
+        XCTAssertTrue(CleanupPolicy.propose(input).isEmpty)
+    }
+
+    func testEphemeralCloneIsNeverProposedForDataErase() {
+        // clone 증거가 있으면 삭제 후보만 나오고 초기화 후보는 나오지 않는다.
+        let input = CleanupPolicyInput(
+            simulatorDevices: [device(sizeBytes: 3 << 30)],
+            devicePlistEvidence: [cloneEvidence()],
+            now: now
+        )
+        XCTAssertEqual(CleanupPolicy.propose(input).map(\.kind), [.ephemeralCloneSimulatorDevice])
+    }
+
+    func testNonShutdownStatesAreNeverEraseCandidates() {
+        let states: [SimulatorDeviceState] = [
+            .booted, .creating, .shuttingDown, .unknown("Rebooting"), .unknown(""),
+        ]
+        for state in states {
+            let input = CleanupPolicyInput(
+                simulatorDevices: [device(state: state, sizeBytes: 3 << 30)],
+                now: now
+            )
+            XCTAssertTrue(
+                CleanupPolicy.propose(input).isEmpty,
+                "\(state) 상태 기기는 초기화 후보가 되면 안 됨"
+            )
+        }
+    }
+
+    func testUnavailableOrUnknownAvailabilitySimulatorIsNeverAnEraseCandidate() {
+        // 확인 불가(nil)는 아무 후보도 아니고, 사용 불가(false)는 삭제 후보 경로로만 간다.
+        let unknown = CleanupPolicyInput(
+            simulatorDevices: [device(isAvailable: nil, sizeBytes: 3 << 30)],
+            now: now
+        )
+        XCTAssertTrue(CleanupPolicy.propose(unknown).isEmpty)
+
+        let unavailable = CleanupPolicyInput(
+            simulatorDevices: [device(isAvailable: false, sizeBytes: 3 << 30)],
+            now: now
+        )
+        XCTAssertEqual(CleanupPolicy.propose(unavailable).map(\.kind), [.unavailableSimulatorDevice])
     }
 
     // MARK: - DerivedData

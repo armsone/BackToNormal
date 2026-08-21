@@ -1,7 +1,7 @@
 import Foundation
 import BackToNormalCore
 
-enum CleanupExecutionStatus: String, Sendable {
+enum CleanupExecutionStatus: String, Sendable, Equatable, Codable {
     case cleaned
     case blocked
     case failed
@@ -34,6 +34,8 @@ enum CleanupExecutor {
         switch candidate.kind {
         case .unavailableSimulatorDevice, .ephemeralCloneSimulatorDevice:
             return deleteSimulator(candidate)
+        case .simulatorDataErase:
+            return eraseSimulator(candidate)
         case .derivedDataProject:
             return moveToTrash(candidate, allowedRoot: CleanupEvidenceCollector.derivedDataRoot)
         case .xctestDeviceDirectory:
@@ -63,6 +65,35 @@ enum CleanupExecutor {
             return result(candidate, .failed, detail.isEmpty ? "simctl이 삭제를 완료하지 못했습니다." : detail)
         }
         return result(candidate, .cleaned, "종료 상태를 다시 확인한 뒤 시뮬레이터를 삭제했습니다. 내부 데이터는 복구할 수 없습니다.")
+    }
+
+    /// 기기는 남기고 내부 데이터만 지운다. 삭제와 동일하게 실행 직전 상태를 다시 확인한다.
+    private static func eraseSimulator(_ candidate: CleanupCandidate) -> CleanupExecutionResult {
+        guard UUID(uuidString: candidate.targetIdentifier) != nil else {
+            return result(candidate, .blocked, "시뮬레이터 식별자가 올바르지 않아 중단했습니다.")
+        }
+        // simctl erase 직전에 상태를 한 번 더 읽어 부팅·생성·종료 전환이 시작된 기기를 차단한다.
+        let immediateInput = CleanupEvidenceCollector.collect(for: candidate.kind, measureSizes: false)
+        let immediateValidation = CleanupRevalidation.revalidate(candidate: candidate, against: immediateInput)
+        guard immediateValidation.isAllowed else {
+            return result(candidate, .blocked, immediateValidation.koreanReason)
+        }
+        guard let command = ControlledCommand.run(
+            executable: "/usr/bin/xcrun",
+            arguments: ["simctl", "erase", candidate.targetIdentifier],
+            timeout: 120
+        ) else {
+            return result(candidate, .failed, "simctl을 시작하지 못했습니다.")
+        }
+        guard command.status == 0 else {
+            let detail = command.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            return result(candidate, .failed, detail.isEmpty ? "simctl이 초기화를 완료하지 못했습니다." : detail)
+        }
+        return result(
+            candidate, .cleaned,
+            "종료 상태를 다시 확인한 뒤 시뮬레이터 데이터를 초기화했습니다. "
+                + "앱·콘텐츠 데이터는 복구할 수 없지만 기기는 그대로 남아 다시 사용할 수 있습니다."
+        )
     }
 
     private static func moveToTrash(

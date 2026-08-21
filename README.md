@@ -14,19 +14,26 @@
     iOS 시뮬레이터 / Android 에뮬레이터 / ADB / 브라우저 자동화 / 로컬 서버
 - 상세 창(측정값·진단·프로세스 목록)과 수동 새로고침, 30초 자동 새로고침
 - 사용 불가 또는 종료된 테스트 복제 시뮬레이터를 개별 선택해 `simctl`로 삭제
+- 종료된 정상 시뮬레이터의 데이터가 512 MiB 이상이면 기기는 남기고 앱·콘텐츠 데이터만 초기화
 - 24시간 이상 수정되지 않은 개별 DerivedData 프로젝트와 7일 이상 된 종료 상태 XCTest 기기 데이터를 휴지통으로 이동
 - 30분 이상 launchd에 재부착되어 있고 CPU 1% 이하·상주 메모리 64 MiB 이상인 명확한
   Gradle/Kotlin 데몬·테스트 러너·브라우저 자동화·로컬 개발 서버를 메모리 정리 후보로 제안
 - 사용자가 선택한 프로세스는 실행 직전 소유자·PID·PPID·명령줄·경과 시간·자원 상태를 다시 확인하고
   정확한 PID 하나에만 `SIGTERM` 요청
-- 모든 정리 후보 기본 미선택, 최종 확인, 항목별 실행 직전 재검증과 결과 기록
+- 수동으로 찾은 정리 후보는 기본 미선택, 최종 확인, 항목별 실행 직전 재검증과 결과 기록
+- 정리 전후 메모리 압박·사용 가능 메모리·디스크 여유·스왑 관측값을 분리해 표시
+- 보호한 파일·시뮬레이터·프로세스 실행 파일은 이후 제안에서 제외
+- 최근 200건의 정리 결과를 로컬 Application Support에 저장
+- `자동 정리`는 저위험·휴지통 복구 가능 파일만 즉시 정리하고, 시뮬레이터 정리는 최종 확인 후 실행
 
 ## 무엇을 하지 않나 (안전 경계)
 
 - 일반 Java·Node, Xcode, 시뮬레이터·에뮬레이터, ADB와 시스템 프로세스는 종료 후보로 만들지 않습니다
 - 메모리 후보는 자동 선택하거나 자동 종료하지 않으며, `SIGKILL`·프로세스 그룹 종료·광범위한 데몬 중지 명령을 사용하지 않습니다
+- 로컬 개발 서버는 의도적인 상시 실행 가능성이 높아 관찰만 하며 종료하지 않습니다
+- 자동 정리는 확인 없이 복구 불가능한 시뮬레이터 정리나 프로세스 종료를 실행하지 않습니다
 - 포트 자체를 닫지 않습니다
-- 정리 후보는 자동 선택하거나 자동 실행하지 않습니다
+- 수동으로 찾은 정리 후보는 자동 선택하거나 자동 실행하지 않습니다
 - DerivedData와 XCTest 데이터는 영구 삭제하지 않고 휴지통으로만 이동합니다
 - 시뮬레이터 삭제는 복구 불가임을 확인 화면에 표시하며, 종료 상태를 다시 확인한 뒤 개별 UDID만 삭제합니다
 - 관리자 권한을 요구하지 않습니다
@@ -85,8 +92,10 @@ Sources/BackToNormal/       # 앱 타깃
   CleanupEvidenceCollector.swift # 정리 후보 근거 수집
   CleanupExecutor.swift     #   재검증 후 simctl 삭제 또는 휴지통 이동
   ProcessCleanupExecutor.swift # 재검증 후 정확한 PID 하나에 SIGTERM 요청
+  CleanupHistory.swift      # 보호 목록·정리 이력·실제 전후 지표
   MonitorViewModel.swift    #   수집→진단→화면 연결, 자동 새로고침
   BackToNormalApp.swift     #   MenuBarExtra + 상세 Window
   MenuContentView.swift / DetailView.swift
-Tests/BackToNormalCoreTests/  # 파싱·분류·진단 테스트
+Tests/BackToNormalCoreTests/  # 파싱·분류·진단 정책 테스트
+Tests/BackToNormalTests/      # 실제 실행 경계·이력 저장 테스트
 ```

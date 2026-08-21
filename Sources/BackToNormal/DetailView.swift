@@ -96,7 +96,7 @@ struct DetailView: View {
         GroupBox("안전한 원상복구") {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("후보는 자동 선택되지 않으며, 실행 직전에 다시 확인합니다.")
+                    Text("수동 목록의 후보는 자동 선택되지 않으며, 실행 직전에 다시 확인합니다.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -108,14 +108,37 @@ struct DetailView: View {
                             systemImage: "magnifyingglass"
                         )
                     }
-                    .disabled(model.isScanningCleanup || model.isCleaning)
+                    .disabled(model.isCleanupBusy)
+                    Button {
+                        model.runAutomaticCleanup()
+                    } label: {
+                        Label("자동 정리", systemImage: "wand.and.stars")
+                    }
+                    .disabled(model.isCleanupBusy)
+                    .help("저위험이며 휴지통에서 복원 가능한 파일을 자동으로 정리한 뒤, 시뮬레이터 정리는 최종 확인 창에서 승인을 요청합니다. 확인 없이 시뮬레이터를 지우지 않습니다.")
+                }
+
+                Text("자동 정리는 저위험·휴지통 복구 가능 파일만 즉시 실행합니다. 시뮬레이터 정리(데이터 초기화·삭제)는 이어서 열리는 최종 확인 창에서 승인해야 실행되고, 프로세스 종료는 수동 확인이 필요합니다.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                if !model.protectedCleanupIDs.isEmpty {
+                    HStack {
+                        Label("보호된 대상 \(model.protectedCleanupIDs.count)개는 제안에서 제외됩니다.", systemImage: "shield.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("보호 목록 초기화") { model.clearProtections() }
+                            .font(.caption)
+                            .disabled(model.isCleanupBusy)
+                    }
                 }
 
                 if model.isScanningCleanup {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 } else if model.cleanupCandidates.isEmpty && model.processCleanupCandidates.isEmpty {
-                    Text("버튼을 눌러 오래된 DerivedData, XCTest 데이터, 종료된 테스트 시뮬레이터와 방치된 것으로 보이는 개발 프로세스를 확인하세요.")
+                    Text("버튼을 눌러 오래된 DerivedData, XCTest 데이터, 종료된 테스트 시뮬레이터, 데이터가 큰 시뮬레이터와 방치된 것으로 보이는 개발 프로세스를 확인하세요.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 } else {
@@ -128,7 +151,9 @@ struct DetailView: View {
                                 CleanupCandidateRow(
                                     candidate: candidate,
                                     isSelected: model.selectedCleanupIDs.contains(candidate.id),
-                                    toggle: { model.toggleCleanupCandidate(candidate) }
+                                    isDisabled: model.isCleanupBusy,
+                                    toggle: { model.toggleCleanupCandidate(candidate) },
+                                    protect: { model.protectCleanupCandidate(id: candidate.id) }
                                 )
                             }
                         }
@@ -143,7 +168,9 @@ struct DetailView: View {
                                 ProcessCleanupCandidateRow(
                                     candidate: candidate,
                                     isSelected: model.selectedProcessCleanupIDs.contains(candidate.id),
-                                    toggle: { model.toggleProcessCleanupCandidate(candidate) }
+                                    isDisabled: model.isCleanupBusy,
+                                    toggle: { model.toggleProcessCleanupCandidate(candidate) },
+                                    protect: { model.protectCleanupCandidate(id: candidate.protectionIdentifier) }
                                 )
                             }
                         }
@@ -162,12 +189,22 @@ struct DetailView: View {
                             model.requestCleanupConfirmation()
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled((model.selectedCandidates.isEmpty && model.selectedProcessCandidates.isEmpty) || model.isCleaning)
+                        .disabled((model.selectedCandidates.isEmpty && model.selectedProcessCandidates.isEmpty) || model.isCleanupBusy)
                     }
                 }
 
                 if model.isCleaning {
-                    ProgressView("항목마다 안전 조건을 다시 확인하고 있습니다…")
+                    ProgressView(
+                        model.isAutoCleaning
+                            ? "자동 정리 대상을 찾고 항목마다 다시 확인하고 있습니다…"
+                            : "항목마다 안전 조건을 다시 확인하고 있습니다…"
+                    )
+                }
+
+                if let summary = model.automaticCleanupSummary {
+                    Label(summary, systemImage: "wand.and.stars")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
 
                 ForEach(model.cleanupResults) { result in
@@ -184,6 +221,31 @@ struct DetailView: View {
                         title: "\(result.status.koreanLabel): \(result.candidate.kind.koreanLabel) (pid \(result.candidate.pid))",
                         message: result.message
                     )
+                }
+
+                if let impact = model.cleanupImpact {
+                    CleanupImpactView(impact: impact)
+                }
+
+                if !model.cleanupHistory.isEmpty {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("최근 정리 기록")
+                            .font(.caption.bold())
+                            .foregroundStyle(.secondary)
+                        ForEach(model.cleanupHistory.suffix(5).reversed()) { entry in
+                            HStack(alignment: .firstTextBaseline) {
+                                Image(systemName: entry.status == .cleaned ? "checkmark.circle" : "exclamationmark.triangle")
+                                    .foregroundStyle(entry.status == .cleaned ? .green : .orange)
+                                Text("\(entry.category) · \(entry.target)")
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(entry.timestamp.formatted(date: .abbreviated, time: .shortened))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.caption)
+                        }
+                    }
+                    .padding(.top, 4)
                 }
             }
             .padding(4)
@@ -252,11 +314,14 @@ struct DetailView: View {
 private struct CleanupCandidateRow: View {
     let candidate: CleanupCandidate
     let isSelected: Bool
+    let isDisabled: Bool
     let toggle: () -> Void
+    let protect: () -> Void
 
     var body: some View {
-        Button(action: toggle) {
-            HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 8) {
+            Button(action: toggle) {
+                HStack(alignment: .top, spacing: 10) {
                 Image(systemName: isSelected ? "checkmark.square.fill" : "square")
                     .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                 VStack(alignment: .leading, spacing: 3) {
@@ -280,10 +345,19 @@ private struct CleanupCandidateRow: View {
                     .font(.caption2)
                     .foregroundStyle(candidate.isRecoverable ? .green : .orange)
                 }
+                }
+                .contentShape(Rectangle())
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .disabled(isDisabled)
+            Button(action: protect) {
+                Image(systemName: "shield")
+            }
+            .buttonStyle(.borderless)
+            .disabled(isDisabled)
+            .help("이 대상을 보호하고 앞으로 제안하지 않기")
         }
-        .buttonStyle(.plain)
         .padding(8)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
     }
@@ -313,12 +387,15 @@ private struct CleanupResultLabel: View {
 private struct ProcessCleanupCandidateRow: View {
     let candidate: ProcessCleanupCandidate
     let isSelected: Bool
+    let isDisabled: Bool
     let toggle: () -> Void
+    let protect: () -> Void
 
     var body: some View {
-        Button(action: toggle) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+        HStack(alignment: .top, spacing: 8) {
+            Button(action: toggle) {
+                HStack(alignment: .top, spacing: 10) {
+                Image(systemName: candidate.isActionable ? (isSelected ? "checkmark.square.fill" : "square") : "eye")
                     .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
@@ -341,17 +418,74 @@ private struct ProcessCleanupCandidateRow: View {
                     HStack {
                         Text("위험도 \(candidate.risk.koreanLabel)")
                         Text("·")
-                        Text("종료 후 복구 불가")
+                        Text(candidate.isActionable ? "종료 후 복구 불가" : "관찰 전용 · 종료 차단")
                     }
                     .font(.caption2)
                     .foregroundStyle(.orange)
                 }
+                }
+                .contentShape(Rectangle())
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .disabled(isDisabled || !candidate.isActionable)
+            Button(action: protect) {
+                Image(systemName: "shield")
+            }
+            .buttonStyle(.borderless)
+            .disabled(isDisabled)
+            .help("이 프로세스를 보호하고 앞으로 제안하지 않기")
         }
-        .buttonStyle(.plain)
         .padding(8)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct CleanupImpactView: View {
+    let impact: CleanupImpactSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("실제 전후 변화")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
+                GridRow {
+                    Text("메모리 압박")
+                    Text("\(impact.beforeMetrics.memoryPressure.koreanLabel) → \(impact.afterMetrics.memoryPressure.koreanLabel)")
+                }
+                GridRow {
+                    Text("사용 가능 메모리")
+                    Text(byteChange(
+                        before: impact.beforeMetrics.availableMemoryBytes,
+                        after: impact.afterMetrics.availableMemoryBytes
+                    ))
+                }
+                GridRow {
+                    Text("디스크 여유")
+                    Text(byteChange(before: impact.beforeDiskAvailableBytes, after: impact.afterDiskAvailableBytes))
+                }
+                GridRow {
+                    Text("스왑 관측값")
+                    Text("\(DiagnosticEngine.formatBytes(impact.beforeMetrics.swapUsedBytes)) → \(DiagnosticEngine.formatBytes(impact.afterMetrics.swapUsedBytes))")
+                }
+            }
+            .font(.caption.monospacedDigit())
+            Text("스왑은 측정만 하며 앱이 직접 정리하지 않습니다.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(8)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func byteChange(before: UInt64?, after: UInt64?) -> String {
+        guard let before, let after else { return "확인 불가" }
+        let arrow = "\(DiagnosticEngine.formatBytes(before)) → \(DiagnosticEngine.formatBytes(after))"
+        if after >= before {
+            return arrow + " (+\(DiagnosticEngine.formatBytes(after - before)))"
+        }
+        return arrow + " (-\(DiagnosticEngine.formatBytes(before - after)))"
     }
 }
 
@@ -367,14 +501,28 @@ private struct CleanupConfirmationView: View {
         model.selectedCandidates.count + model.selectedProcessCandidates.count
     }
 
+    /// 선택된 시뮬레이터 정리 후보(데이터 초기화·삭제)의 예상 확보 크기.
+    private var simulatorSelectionBytes: UInt64 {
+        model.selectedCandidates
+            .filter { $0.kind.targetsSimulator }
+            .reduce(0) { $0 + $1.estimatedBytes }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Label("정리 전 마지막 확인", systemImage: "checkmark.shield")
                 .font(.title2.bold())
             Text("선택한 \(totalSelectionCount)개 항목을 실행 직전에 다시 검사합니다. 조건이 달라진 항목은 건드리지 않습니다.")
             if irreversibleCount > 0 {
-                Label("시뮬레이터 \(irreversibleCount)개는 삭제 후 내부 데이터를 복구할 수 없습니다.", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("시뮬레이터 \(irreversibleCount)개는 실행 후 내부 데이터를 복구할 수 없습니다.", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    if simulatorSelectionBytes > 0 {
+                        Text("시뮬레이터에서 예상 확보 \(DiagnosticEngine.formatBytes(simulatorSelectionBytes)) · 데이터 초기화는 기기 자체를 남기고 앱·콘텐츠 데이터만 지웁니다.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             if !model.selectedProcessCandidates.isEmpty {
                 Label(

@@ -38,6 +38,9 @@ public struct CleanupPolicyInput: Sendable, Equatable {
 /// 제안만 하며 삭제·종료 등 어떤 실행도 하지 않는다. 프로세스 종료 후보는 만들지 않는다.
 public enum CleanupPolicy {
 
+    /// 데이터 초기화 후보가 되는 시뮬레이터 데이터의 최소 크기 (512 MiB).
+    /// 측정값이 이보다 작거나 없으면 초기화를 제안하지 않는다.
+    public static let simulatorDataEraseMinimumBytes: UInt64 = 512 << 20
     /// DerivedData 개별 프로젝트의 최소 나이 (24시간).
     public static let derivedDataMinimumAgeSeconds: TimeInterval = 24 * 60 * 60
     /// XCTestDevices 디렉터리의 최소 나이 (7일).
@@ -92,28 +95,48 @@ public enum CleanupPolicy {
                 continue
             }
 
-            // 규칙 2: 테스트용 임시(clone) 기기.
-            // device.plist 증거(UDID 일치 + isEphemeral == true)와
-            // 현재 상태가 정확히 Shutdown이며 사용 가능(true)일 때만 후보가 된다.
+            // 규칙 2와 3은 모두 현재 상태가 정확히 Shutdown이며 사용 가능(true)일 때만 적용된다.
             // Booted/Creating/Shutting Down/unknown 상태는 절대 후보가 아니다.
+            guard device.state == .shutdown, device.isAvailable == true else { continue }
+
+            // 규칙 2: 테스트용 임시(clone) 기기.
+            // device.plist 증거(UDID 일치 + isEphemeral == true)가 있을 때만 삭제 후보가 된다.
+            if let evidence = evidenceByUDID[device.udid], evidence.indicatesClone {
+                result.append(CleanupCandidate(
+                    id: "sim-clone:\(device.udid.uuidString.lowercased())",
+                    kind: .ephemeralCloneSimulatorDevice,
+                    targetIdentifier: device.udid.uuidString,
+                    targetPath: device.dataPath,
+                    koreanReason: "테스트가 만든 임시 복제 시뮬레이터 '\(device.name)'입니다. "
+                        + "현재 종료 상태이며, 삭제해도 다음 테스트가 새로 만듭니다.",
+                    estimatedBytes: device.dataSizeBytes ?? 0,
+                    risk: .low,
+                    isRecoverable: false,
+                    recoveryMethod: .notRecoverable
+                ))
+                continue
+            }
+
+            // 규칙 3: 정상(비임시) 기기의 데이터 초기화 (simctl erase).
+            // 기기 자체는 남기고 내부 데이터만 지운다. 측정된 크기가 최소 기준 이상일 때만 제안한다.
             guard
-                device.state == .shutdown,
-                device.isAvailable == true,
-                let evidence = evidenceByUDID[device.udid],
-                evidence.indicatesClone
+                let sizeBytes = device.dataSizeBytes,
+                sizeBytes >= simulatorDataEraseMinimumBytes
             else { continue }
 
             result.append(CleanupCandidate(
-                id: "sim-clone:\(device.udid.uuidString.lowercased())",
-                kind: .ephemeralCloneSimulatorDevice,
+                id: "sim-erase:\(device.udid.uuidString.lowercased())",
+                kind: .simulatorDataErase,
                 targetIdentifier: device.udid.uuidString,
                 targetPath: device.dataPath,
-                koreanReason: "테스트가 만든 임시 복제 시뮬레이터 '\(device.name)'입니다. "
-                    + "현재 종료 상태이며, 삭제해도 다음 테스트가 새로 만듭니다.",
-                estimatedBytes: device.dataSizeBytes ?? 0,
-                risk: .low,
+                koreanReason: "시뮬레이터 '\(device.name)'의 앱·콘텐츠 데이터가 "
+                    + "\(DiagnosticEngine.formatBytes(sizeBytes))를 차지하고 있습니다. "
+                    + "초기화하면 이 데이터는 되돌릴 수 없이 지워지지만, "
+                    + "시뮬레이터 기기 자체는 그대로 남아 바로 다시 사용할 수 있습니다.",
+                estimatedBytes: sizeBytes,
+                risk: .medium,
                 isRecoverable: false,
-                recoveryMethod: .notRecoverable
+                recoveryMethod: .recreatable
             ))
         }
         return result

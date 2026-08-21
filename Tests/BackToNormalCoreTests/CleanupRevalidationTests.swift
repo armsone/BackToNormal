@@ -29,6 +29,27 @@ final class CleanupRevalidationTests: XCTestCase {
         )
     }
 
+    private func eraseInput(
+        state: SimulatorDeviceState = .shutdown,
+        isAvailable: Bool? = true,
+        sizeBytes: UInt64? = 2 << 30
+    ) -> CleanupPolicyInput {
+        CleanupPolicyInput(
+            simulatorDevices: [
+                SimulatorDevice(
+                    udid: udid,
+                    name: "iPhone 15",
+                    runtimeIdentifier: "com.apple.CoreSimulator.SimRuntime.iOS-17-0",
+                    state: state,
+                    isAvailable: isAvailable,
+                    dataPath: "/tmp/fixture/\(udid)",
+                    dataSizeBytes: sizeBytes
+                )
+            ],
+            now: now
+        )
+    }
+
     private func derivedDataInput(
         ageSeconds: TimeInterval,
         devProcesses: [ClassifiedProcess]? = [],
@@ -85,6 +106,59 @@ final class CleanupRevalidationTests: XCTestCase {
 
     func testFreshCollectionFailureBlocksCandidate() throws {
         let candidate = try XCTUnwrap(CleanupPolicy.propose(cloneInput()).first)
+        let failedInput = CleanupPolicyInput(simulatorDevices: nil, now: now)
+
+        let result = CleanupRevalidation.revalidate(candidate: candidate, against: failedInput)
+
+        XCTAssertFalse(result.isAllowed)
+    }
+
+    func testUnchangedEraseEvidenceAllowsCandidate() throws {
+        let input = eraseInput()
+        let candidate = try XCTUnwrap(CleanupPolicy.propose(input).first)
+        XCTAssertEqual(candidate.kind, .simulatorDataErase)
+
+        let result = CleanupRevalidation.revalidate(candidate: candidate, against: input)
+
+        XCTAssertTrue(result.isAllowed)
+    }
+
+    func testDeviceBootedSinceProposalBlocksEraseCandidate() throws {
+        let candidate = try XCTUnwrap(CleanupPolicy.propose(eraseInput()).first)
+
+        let result = CleanupRevalidation.revalidate(
+            candidate: candidate,
+            against: eraseInput(state: .booted)
+        )
+
+        XCTAssertFalse(result.isAllowed)
+    }
+
+    func testSizeDroppedBelowThresholdBlocksEraseCandidate() throws {
+        let candidate = try XCTUnwrap(CleanupPolicy.propose(eraseInput()).first)
+
+        // 그 사이 데이터가 지워져 크기 조건이 더 이상 성립하지 않으면 실행하지 않는다.
+        let result = CleanupRevalidation.revalidate(
+            candidate: candidate,
+            against: eraseInput(sizeBytes: 1 << 20)
+        )
+
+        XCTAssertFalse(result.isAllowed)
+    }
+
+    func testAvailabilityLostSinceProposalBlocksEraseCandidate() throws {
+        let candidate = try XCTUnwrap(CleanupPolicy.propose(eraseInput()).first)
+
+        let result = CleanupRevalidation.revalidate(
+            candidate: candidate,
+            against: eraseInput(isAvailable: false)
+        )
+
+        XCTAssertFalse(result.isAllowed)
+    }
+
+    func testFreshCollectionFailureBlocksEraseCandidate() throws {
+        let candidate = try XCTUnwrap(CleanupPolicy.propose(eraseInput()).first)
         let failedInput = CleanupPolicyInput(simulatorDevices: nil, now: now)
 
         let result = CleanupRevalidation.revalidate(candidate: candidate, against: failedInput)
