@@ -13,6 +13,7 @@
   - Gradle / Kotlin 데몬 / Java / Node.js / Xcode 빌드 / 테스트 러너 /
     iOS 시뮬레이터 / Android 에뮬레이터 / ADB / 브라우저 자동화 / 로컬 서버
 - 상세 창(측정값·진단·프로세스 목록)과 수동 새로고침, 30초 자동 새로고침
+- 메모리 압박 시 실행 중인 시뮬레이터를 기기 데이터를 유지한 채 개별 종료하거나 활동 모니터로 일반 앱 확인
 - 사용 불가 또는 종료된 테스트 복제 시뮬레이터를 개별 선택해 `simctl`로 삭제
 - 종료된 정상 시뮬레이터의 데이터가 512 MiB 이상이면 기기는 남기고 앱·콘텐츠 데이터만 초기화
 - 24시간 이상 수정되지 않은 개별 DerivedData 프로젝트와 7일 이상 된 종료 상태 XCTest 기기 데이터를 휴지통으로 이동
@@ -24,11 +25,12 @@
 - 정리 전후 메모리 압박·사용 가능 메모리·디스크 여유·스왑 관측값을 분리해 표시
 - 보호한 파일·시뮬레이터·프로세스 실행 파일은 이후 제안에서 제외
 - 최근 200건의 정리 결과를 로컬 Application Support에 저장
-- `자동 정리`는 저위험·휴지통 복구 가능 파일만 즉시 정리하고, 시뮬레이터 정리는 최종 확인 후 실행
+- `자동 정리`는 저위험·휴지통 복구 가능 파일만 즉시 정리하고, 시뮬레이터와 프로세스는 개별 선택·최종 확인 후 실행
 
 ## 무엇을 하지 않나 (안전 경계)
 
-- 일반 Java·Node, Xcode, 시뮬레이터·에뮬레이터, ADB와 시스템 프로세스는 종료 후보로 만들지 않습니다
+- 일반 Java·Node, Xcode, 시뮬레이터·에뮬레이터, ADB와 시스템 프로세스는 프로세스 종료 후보로 만들지 않습니다
+- 실행 중인 iOS 시뮬레이터 기기는 별도 `simctl shutdown` 후보로만 제안하며 앱·콘텐츠 데이터는 지우지 않습니다
 - 메모리 후보는 자동 선택하거나 자동 종료하지 않으며, `SIGKILL`·프로세스 그룹 종료·광범위한 데몬 중지 명령을 사용하지 않습니다
 - 로컬 개발 서버는 의도적인 상시 실행 가능성이 높아 관찰만 하며 종료하지 않습니다
 - 자동 정리는 확인 없이 복구 불가능한 시뮬레이터 정리나 프로세스 종료를 실행하지 않습니다
@@ -90,7 +92,7 @@ Sources/BackToNormal/       # 앱 타깃
   ProcessCollector.swift    #   /bin/ps 읽기 전용 실행
   StorageCollector.swift    #   디스크·시뮬레이터·DerivedData 용량 읽기(10분 캐시)
   CleanupEvidenceCollector.swift # 정리 후보 근거 수집
-  CleanupExecutor.swift     #   재검증 후 simctl 삭제 또는 휴지통 이동
+  CleanupExecutor.swift     #   재검증 후 simctl 종료·삭제 또는 휴지통 이동
   ProcessCleanupExecutor.swift # 재검증 후 정확한 PID 하나에 SIGTERM 요청
   CleanupHistory.swift      # 보호 목록·정리 이력·실제 전후 지표
   MonitorViewModel.swift    #   수집→진단→화면 연결, 자동 새로고침

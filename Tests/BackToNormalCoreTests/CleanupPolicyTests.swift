@@ -60,6 +60,31 @@ final class CleanupPolicyTests: XCTestCase {
 
     // MARK: - 사용 불가 시뮬레이터
 
+    func testBootedAvailableSimulatorIsProposedForSafeShutdown() {
+        let candidate = CleanupPolicy.propose(CleanupPolicyInput(
+            simulatorDevices: [device(state: .booted)],
+            now: now
+        )).first
+
+        XCTAssertEqual(candidate?.kind, .bootedSimulatorShutdown)
+        XCTAssertEqual(candidate?.id, "sim-shutdown:\(udidA.uuidString.lowercased())")
+        XCTAssertEqual(candidate?.risk, .medium)
+        XCTAssertTrue(candidate?.isRecoverable == true)
+        XCTAssertEqual(candidate?.recoveryMethod, .restartable)
+        XCTAssertEqual(candidate?.estimatedBytes, 0)
+    }
+
+    func testBootedSimulatorWithoutConfirmedAvailabilityIsNotProposed() {
+        for availability in [false, nil] as [Bool?] {
+            let candidates = CleanupPolicy.propose(CleanupPolicyInput(
+                simulatorDevices: [device(state: .booted, isAvailable: availability)],
+                now: now
+            ))
+
+            XCTAssertFalse(candidates.contains { $0.kind == .bootedSimulatorShutdown })
+        }
+    }
+
     func testUnavailableShutdownDeviceIsProposed() {
         let input = CleanupPolicyInput(
             simulatorDevices: [device(isAvailable: false)],
@@ -160,10 +185,9 @@ final class CleanupPolicyTests: XCTestCase {
                 devicePlistEvidence: [cloneEvidence()],
                 now: now
             )
-            XCTAssertTrue(
-                CleanupPolicy.propose(input).isEmpty,
-                "\(state) 상태 기기는 후보가 되면 안 됨"
-            )
+            let kinds = CleanupPolicy.propose(input).map(\.kind)
+            XCTAssertFalse(kinds.contains(.ephemeralCloneSimulatorDevice))
+            XCTAssertEqual(kinds, state == .booted ? [.bootedSimulatorShutdown] : [])
         }
     }
 
@@ -234,9 +258,7 @@ final class CleanupPolicyTests: XCTestCase {
     }
 
     func testNonShutdownStatesAreNeverEraseCandidates() {
-        let states: [SimulatorDeviceState] = [
-            .booted, .creating, .shuttingDown, .unknown("Rebooting"), .unknown(""),
-        ]
+        let states: [SimulatorDeviceState] = [.creating, .shuttingDown, .unknown("Rebooting"), .unknown("")]
         for state in states {
             let input = CleanupPolicyInput(
                 simulatorDevices: [device(state: state, sizeBytes: 3 << 30)],
@@ -503,7 +525,7 @@ final class CleanupPolicyTests: XCTestCase {
     }
 
     func testNoCandidateEverTargetsAProcess() {
-        // 정책이 만드는 모든 후보 종류는 저장 공간 대상이다. 프로세스 종료 후보는 존재하지 않는다.
+        // 이 정책은 프로세스 후보를 만들지 않는다. 프로세스 정리는 별도 타입과 정책을 사용한다.
         for kind in CleanupCandidateKind.allCases {
             XCTAssertFalse(kind.rawValue.lowercased().contains("process"))
         }

@@ -23,6 +23,11 @@ final class AutomaticCleanupPolicyTests: XCTestCase {
             kind: .simulatorDataErase
         )))
         XCTAssertFalse(AutomaticCleanupPolicy.isEligible(candidate(
+            kind: .bootedSimulatorShutdown,
+            risk: .medium,
+            recovery: .restartable
+        )))
+        XCTAssertFalse(AutomaticCleanupPolicy.isEligible(candidate(
             recoverable: false
         )))
         XCTAssertFalse(AutomaticCleanupPolicy.isEligible(candidate(
@@ -46,14 +51,20 @@ final class AutomaticCleanupPolicyTests: XCTestCase {
             recovery: .recreatable,
             recoverable: false
         )
+        let shutdown = candidate(
+            id: "shutdown",
+            kind: .bootedSimulatorShutdown,
+            risk: .medium,
+            recovery: .restartable
+        )
 
         let plan = AutomaticCleanupPolicy.makePlan(
-            candidates: [automatic, protected, irreversible, erase],
+            candidates: [automatic, protected, irreversible, erase, shutdown],
             protectedIdentifiers: ["protected"]
         )
 
         XCTAssertEqual(plan.targets.map(\.id), ["auto"])
-        XCTAssertEqual(plan.manualOnly.map(\.id), ["simulator", "erase"])
+        XCTAssertEqual(plan.manualOnly.map(\.id), ["simulator", "erase", "shutdown"])
     }
 
     func testNoProcessCandidateTypeCanEnterAutomaticPlan() {

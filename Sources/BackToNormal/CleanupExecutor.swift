@@ -32,6 +32,8 @@ enum CleanupExecutor {
         }
 
         switch candidate.kind {
+        case .bootedSimulatorShutdown:
+            return shutdownSimulator(candidate)
         case .unavailableSimulatorDevice, .ephemeralCloneSimulatorDevice:
             return deleteSimulator(candidate)
         case .simulatorDataErase:
@@ -41,6 +43,30 @@ enum CleanupExecutor {
         case .xctestDeviceDirectory:
             return moveToTrash(candidate, allowedRoot: CleanupEvidenceCollector.xctestDevicesRoot)
         }
+    }
+
+    /// 정확히 선택한 실행 중 시뮬레이터 하나만 종료한다. 기기와 내부 데이터는 지우지 않는다.
+    private static func shutdownSimulator(_ candidate: CleanupCandidate) -> CleanupExecutionResult {
+        guard UUID(uuidString: candidate.targetIdentifier) != nil else {
+            return result(candidate, .blocked, "시뮬레이터 식별자가 올바르지 않아 중단했습니다.")
+        }
+        let immediateInput = CleanupEvidenceCollector.collect(for: candidate.kind, measureSizes: false)
+        let immediateValidation = CleanupRevalidation.revalidate(candidate: candidate, against: immediateInput)
+        guard immediateValidation.isAllowed else {
+            return result(candidate, .blocked, immediateValidation.koreanReason)
+        }
+        guard let command = ControlledCommand.run(
+            executable: "/usr/bin/xcrun",
+            arguments: ["simctl", "shutdown", candidate.targetIdentifier],
+            timeout: 60
+        ) else {
+            return result(candidate, .failed, "simctl을 시작하지 못했습니다.")
+        }
+        guard command.status == 0 else {
+            let detail = command.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            return result(candidate, .failed, detail.isEmpty ? "시뮬레이터를 종료하지 못했습니다." : detail)
+        }
+        return result(candidate, .cleaned, "시뮬레이터를 종료했습니다. 기기와 내부 데이터는 그대로 유지됩니다.")
     }
 
     private static func deleteSimulator(_ candidate: CleanupCandidate) -> CleanupExecutionResult {

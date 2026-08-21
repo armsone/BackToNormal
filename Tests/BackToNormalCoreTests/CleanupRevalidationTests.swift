@@ -50,6 +50,22 @@ final class CleanupRevalidationTests: XCTestCase {
         )
     }
 
+    private func shutdownInput(state: SimulatorDeviceState = .booted) -> CleanupPolicyInput {
+        CleanupPolicyInput(
+            simulatorDevices: [
+                SimulatorDevice(
+                    udid: udid,
+                    name: "iPhone 15",
+                    runtimeIdentifier: "com.apple.CoreSimulator.SimRuntime.iOS-17-0",
+                    state: state,
+                    isAvailable: true,
+                    dataPath: "/tmp/fixture/\(udid)"
+                )
+            ],
+            now: now
+        )
+    }
+
     private func derivedDataInput(
         ageSeconds: TimeInterval,
         devProcesses: [ClassifiedProcess]? = [],
@@ -111,6 +127,23 @@ final class CleanupRevalidationTests: XCTestCase {
         let result = CleanupRevalidation.revalidate(candidate: candidate, against: failedInput)
 
         XCTAssertFalse(result.isAllowed)
+    }
+
+    func testUnchangedBootedSimulatorAllowsShutdownCandidate() throws {
+        let input = shutdownInput()
+        let candidate = try XCTUnwrap(CleanupPolicy.propose(input).first)
+
+        XCTAssertEqual(candidate.kind, .bootedSimulatorShutdown)
+        XCTAssertTrue(CleanupRevalidation.revalidate(candidate: candidate, against: input).isAllowed)
+    }
+
+    func testAlreadyShutdownSimulatorBlocksShutdownCandidate() throws {
+        let candidate = try XCTUnwrap(CleanupPolicy.propose(shutdownInput()).first)
+
+        XCTAssertFalse(CleanupRevalidation.revalidate(
+            candidate: candidate,
+            against: shutdownInput(state: .shutdown)
+        ).isAllowed)
     }
 
     func testUnchangedEraseEvidenceAllowsCandidate() throws {

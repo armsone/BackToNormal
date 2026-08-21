@@ -45,6 +45,9 @@ final class MonitorViewModel: ObservableObject {
     var isAutoCleaning: Bool { cleanupActivity == .autoCleaning }
     var isCleaning: Bool { cleanupActivity == .cleaning || cleanupActivity == .autoCleaning }
     var isCleanupBusy: Bool { cleanupActivity != .idle }
+    var hasMemoryPressure: Bool {
+        metrics?.memoryPressure == .warning || metrics?.memoryPressure == .critical
+    }
 
     init(
         auditStore: CleanupAuditStore = CleanupAuditStore(),

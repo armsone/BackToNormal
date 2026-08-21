@@ -122,6 +122,8 @@ public struct FilesystemCandidateEvidence: Sendable, Equatable {
 
 /// 정리 후보의 종류.
 public enum CleanupCandidateKind: String, Sendable, Equatable, CaseIterable {
+    /// 실행 중인 시뮬레이터를 종료하되 기기와 내부 데이터는 그대로 둔다.
+    case bootedSimulatorShutdown
     case unavailableSimulatorDevice
     case ephemeralCloneSimulatorDevice
     /// 기기는 남기고 내부 앱·콘텐츠 데이터만 지우는 초기화 (simctl erase).
@@ -131,6 +133,7 @@ public enum CleanupCandidateKind: String, Sendable, Equatable, CaseIterable {
 
     public var koreanLabel: String {
         switch self {
+        case .bootedSimulatorShutdown: return "실행 중인 시뮬레이터 종료"
         case .unavailableSimulatorDevice: return "사용 불가 시뮬레이터"
         case .ephemeralCloneSimulatorDevice: return "테스트용 임시 시뮬레이터"
         case .simulatorDataErase: return "시뮬레이터 데이터 초기화"
@@ -139,10 +142,11 @@ public enum CleanupCandidateKind: String, Sendable, Equatable, CaseIterable {
         }
     }
 
-    /// 시뮬레이터를 대상으로 하는 비가역 정리 종류. 자동 정리 후 최종 확인 단계로만 실행된다.
+    /// 시뮬레이터를 대상으로 하며 자동 정리에서 제외되는 수동 작업 종류.
     public var targetsSimulator: Bool {
         switch self {
-        case .unavailableSimulatorDevice, .ephemeralCloneSimulatorDevice, .simulatorDataErase:
+        case .bootedSimulatorShutdown, .unavailableSimulatorDevice,
+             .ephemeralCloneSimulatorDevice, .simulatorDataErase:
             return true
         case .derivedDataProject, .xctestDeviceDirectory:
             return false
@@ -181,6 +185,8 @@ public enum CleanupRisk: String, Sendable, Equatable, Comparable {
 public enum CleanupRecoveryMethod: String, Sendable, Equatable {
     /// 휴지통으로 이동하므로 복원 가능.
     case userTrash
+    /// 실행 중인 대상을 멈출 뿐 데이터는 유지되며 다시 실행할 수 있음.
+    case restartable
     /// 도구가 재생성한다 (예: 재빌드, 시뮬레이터 재생성). 내부 데이터는 돌아오지 않는다.
     case recreatable
     /// 복구 수단 없음.
@@ -189,6 +195,7 @@ public enum CleanupRecoveryMethod: String, Sendable, Equatable {
     public var koreanLabel: String {
         switch self {
         case .userTrash: return "휴지통에서 복원 가능"
+        case .restartable: return "다시 실행 가능 · 데이터 유지"
         case .recreatable: return "재생성 가능 (내부 데이터는 복구 불가)"
         case .notRecoverable: return "복구 불가"
         }

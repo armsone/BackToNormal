@@ -1,5 +1,6 @@
-import SwiftUI
+import AppKit
 import BackToNormalCore
+import SwiftUI
 
 /// 상세 창: 지표, 진단 설명, 개발 관련 프로세스 목록.
 struct DetailView: View {
@@ -9,6 +10,7 @@ struct DetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 header
+                if model.hasMemoryPressure { memoryPressureAction }
                 metricsSection
                 storageSection
                 cleanupSection
@@ -29,6 +31,34 @@ struct DetailView: View {
                 }
                 .disabled(model.isRefreshing)
             }
+        }
+    }
+
+    private var memoryPressureAction: some View {
+        GroupBox("메모리 압박 낮추기") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("실행 중인 시뮬레이터를 기기 데이터를 유지한 채 종료하거나, 안전 조건을 충족한 유휴 개발 프로세스를 골라 메모리를 확보할 수 있습니다.")
+                    .font(.callout)
+                HStack {
+                    Button {
+                        model.scanCleanupCandidates()
+                    } label: {
+                        Label("해결할 항목 찾기", systemImage: "memorychip")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.isCleanupBusy)
+
+                    Button {
+                        let url = URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app")
+                        NSWorkspace.shared.openApplication(at: url, configuration: .init())
+                    } label: {
+                        Label("활동 모니터 열기", systemImage: "gauge.with.dots.needle.67percent")
+                    }
+                    .help("macOS 활동 모니터를 열어 메모리를 많이 쓰는 일반 앱을 직접 확인합니다.")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(4)
         }
     }
 
@@ -115,10 +145,10 @@ struct DetailView: View {
                         Label("자동 정리", systemImage: "wand.and.stars")
                     }
                     .disabled(model.isCleanupBusy)
-                    .help("저위험이며 휴지통에서 복원 가능한 파일을 자동으로 정리한 뒤, 시뮬레이터 정리는 최종 확인 창에서 승인을 요청합니다. 확인 없이 시뮬레이터를 지우지 않습니다.")
+                    .help("저위험이며 휴지통에서 복원 가능한 파일만 자동으로 정리합니다. 시뮬레이터와 프로세스는 자동 선택하거나 실행하지 않습니다.")
                 }
 
-                Text("자동 정리는 저위험·휴지통 복구 가능 파일만 즉시 실행합니다. 시뮬레이터 정리(데이터 초기화·삭제)는 이어서 열리는 최종 확인 창에서 승인해야 실행되고, 프로세스 종료는 수동 확인이 필요합니다.")
+                Text("자동 정리는 저위험·휴지통 복구 가능 파일만 즉시 실행합니다. 시뮬레이터 종료·초기화·삭제와 프로세스 종료는 개별 선택과 최종 확인이 필요합니다.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
@@ -143,7 +173,7 @@ struct DetailView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     if !model.cleanupCandidates.isEmpty {
-                        Text("디스크 공간 확보")
+                        Text("시뮬레이터·디스크 정리")
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
                         VStack(spacing: 6) {
@@ -501,6 +531,10 @@ private struct CleanupConfirmationView: View {
         model.selectedCandidates.count + model.selectedProcessCandidates.count
     }
 
+    private var hasSimulatorShutdown: Bool {
+        model.selectedCandidates.contains { $0.kind == .bootedSimulatorShutdown }
+    }
+
     /// 선택된 시뮬레이터 정리 후보(데이터 초기화·삭제)의 예상 확보 크기.
     private var simulatorSelectionBytes: UInt64 {
         model.selectedCandidates
@@ -554,10 +588,17 @@ private struct CleanupConfirmationView: View {
             }
             .frame(minHeight: 180)
             HStack {
-                // 디스크와 메모리는 다른 자원이므로 합산하지 않고 나란히 보여준다.
+                // 수치화할 수 있는 자원만 표시하고, 시뮬레이터 종료 효과는 과장하지 않는다.
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("디스크 예상 최대 확보 \(DiagnosticEngine.formatBytes(model.selectedCleanupBytes))")
-                    Text("메모리 예상 회수(상주 메모리 기준) \(DiagnosticEngine.formatBytes(model.selectedProcessMemoryBytes))")
+                    if model.selectedCleanupBytes > 0 {
+                        Text("디스크 예상 최대 확보 \(DiagnosticEngine.formatBytes(model.selectedCleanupBytes))")
+                    }
+                    if model.selectedProcessMemoryBytes > 0 {
+                        Text("메모리 예상 회수(상주 메모리 기준) \(DiagnosticEngine.formatBytes(model.selectedProcessMemoryBytes))")
+                    }
+                    if hasSimulatorShutdown {
+                        Text("시뮬레이터 종료의 메모리 회수량은 실행 상태에 따라 달라집니다.")
+                    }
                 }
                 .font(.callout.monospacedDigit())
                 Spacer()
