@@ -20,6 +20,9 @@ final class AutomaticCleanupPolicyTests: XCTestCase {
             recoverable: false
         )))
         XCTAssertFalse(AutomaticCleanupPolicy.isEligible(candidate(
+            kind: .simulatorDataErase
+        )))
+        XCTAssertFalse(AutomaticCleanupPolicy.isEligible(candidate(
             recoverable: false
         )))
         XCTAssertFalse(AutomaticCleanupPolicy.isEligible(candidate(

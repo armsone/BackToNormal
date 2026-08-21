@@ -134,8 +134,8 @@ final class MonitorViewModel: ObservableObject {
 
     /// 신선한 근거를 수집해 저위험이면서 휴지통 복구 가능한 파일만 무확인으로 정리한다.
     /// 그 후 시뮬레이터 정리 후보(데이터 초기화·사용 불가·임시 복제)가 남아 있으면
-    /// 해당 후보만 선택해 기존 최종 확인 창을 연다. 확인 없이는 어떤 시뮬레이터도 지우지 않으며,
-    /// 프로세스 종료와 그 밖의 중간 위험 파일 후보는 자동 선택하지 않는다.
+    /// 목록에 기본 미선택으로 남긴다. 확인 없이는 어떤 시뮬레이터도 지우지 않으며,
+    /// 시뮬레이터·프로세스와 그 밖의 중간 위험 후보는 자동 선택하지 않는다.
     func runAutomaticCleanup() {
         guard cleanupActivity == .idle else { return }
         cleanupActivity = .autoCleaning
@@ -178,12 +178,11 @@ final class MonitorViewModel: ObservableObject {
                 .filter { !protectedIdentifiers.contains($0.id) }
             let refreshedProcessCandidates = ProcessCleanupPolicy.propose(Self.processCleanupInput())
                 .filter { !protectedIdentifiers.contains($0.protectionIdentifier) }
-            // 시뮬레이터 후보만 최종 확인 창으로 넘긴다. 프로세스와 중간 위험 파일 후보는 넘기지 않는다.
             let simulatorFollowUps = refreshedCandidates.filter { $0.kind.targetsSimulator }
             let cleanedCount = results.filter { $0.status == .cleaned }.count
             let failedCount = results.count - cleanedCount
             let manualOnlyCount = plan.manualOnly.filter { !$0.kind.targetsSimulator }.count
-                + proposedProcesses.count
+                + proposedProcesses.filter(\.isActionable).count
             let summary = Self.automaticSummary(
                 cleanedCount: cleanedCount,
                 failedCount: failedCount,
@@ -199,12 +198,11 @@ final class MonitorViewModel: ObservableObject {
                 self.cleanupHistory = self.auditStore.append(auditEntries, to: self.cleanupHistory)
                 self.cleanupCandidates = refreshedCandidates
                 self.processCleanupCandidates = refreshedProcessCandidates
-                self.selectedCleanupIDs = Set(simulatorFollowUps.map(\.id))
+                self.selectedCleanupIDs.removeAll()
                 self.selectedProcessCleanupIDs.removeAll()
                 self.automaticCleanupSummary = summary
                 self.cleanupActivity = .idle
-                // 시뮬레이터 정리는 자동 실행하지 않고 기존 최종 확인 창에서 승인받는다.
-                self.isShowingCleanupConfirmation = !simulatorFollowUps.isEmpty
+                self.isShowingCleanupConfirmation = false
                 if cleanedCount > 0 { self.invalidateStorageScan() }
                 self.refresh()
             }
@@ -334,7 +332,7 @@ final class MonitorViewModel: ObservableObject {
         var parts: [String] = ["안전한 파일 자동 정리 \(cleanedCount)개 완료"]
         if failedCount > 0 { parts.append("\(failedCount)개 차단 또는 실패") }
         if simulatorConfirmationCount > 0 {
-            parts.append("시뮬레이터 정리 \(simulatorConfirmationCount)개는 최종 확인 후에만 실행")
+            parts.append("시뮬레이터 정리 \(simulatorConfirmationCount)개는 개별 선택과 최종 확인 후에만 실행")
         }
         if manualOnlyCount > 0 {
             parts.append("\(manualOnlyCount)개는 수동 확인 필요")

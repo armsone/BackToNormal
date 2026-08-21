@@ -252,7 +252,8 @@ public struct AutomaticCleanupPlan: Sendable, Equatable {
 
 public enum AutomaticCleanupPolicy {
     public static func isEligible(_ candidate: CleanupCandidate) -> Bool {
-        candidate.risk == .low
+        !candidate.kind.targetsSimulator
+            && candidate.risk == .low
             && candidate.isRecoverable
             && candidate.recoveryMethod == .userTrash
     }

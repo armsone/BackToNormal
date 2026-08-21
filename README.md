@@ -45,7 +45,7 @@
 
 ## 설치
 
-GitHub Releases에서 공증된 `BackToNormal-1.2.0.dmg`를 받아 열고, 앱을 Applications로
+GitHub Releases에서 공증된 `BackToNormal-1.2.1.dmg`를 받아 열고, 앱을 Applications로
 드래그합니다. 앱을 실행하면 Dock 대신 메뉴 막대에 원상복구 아이콘이 나타납니다.
 
 ## 개발 빌드와 실행
