@@ -1,5 +1,5 @@
 import XCTest
-@testable import BackToNormalCore
+@testable import BTNCore
 
 /// 실행 직전 재검증 테스트. 순수 함수만 검증하며 아무것도 실행하지 않는다.
 final class CleanupRevalidationTests: XCTestCase {

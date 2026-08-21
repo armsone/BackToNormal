@@ -1,5 +1,5 @@
 import Foundation
-import BackToNormalCore
+import BTNCore
 
 enum CleanupExecutionStatus: String, Sendable, Equatable, Codable {
     case cleaned

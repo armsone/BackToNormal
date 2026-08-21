@@ -1,5 +1,5 @@
 import Foundation
-import BackToNormalCore
+import BTNCore
 
 /// 개발 도구 저장 공간을 읽기 전용으로 측정한다. 삭제나 시뮬레이터 제어는 하지 않는다.
 enum StorageCollector {

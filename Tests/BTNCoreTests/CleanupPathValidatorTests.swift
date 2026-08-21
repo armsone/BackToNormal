@@ -1,12 +1,12 @@
 import XCTest
-@testable import BackToNormalCore
+@testable import BTNCore
 
 final class CleanupPathValidatorTests: XCTestCase {
     private var temporaryRoot: URL!
 
     override func setUpWithError() throws {
         temporaryRoot = FileManager.default.temporaryDirectory
-            .appendingPathComponent("BackToNormalPathTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("BTNPathTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: temporaryRoot, withIntermediateDirectories: false)
     }
 
@@ -40,7 +40,7 @@ final class CleanupPathValidatorTests: XCTestCase {
 
     func testRejectsSymbolicLink() throws {
         let outside = FileManager.default.temporaryDirectory
-            .appendingPathComponent("BackToNormalOutside-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("BTNOutside-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: false)
         defer { try? FileManager.default.removeItem(at: outside) }
         let link = temporaryRoot.appendingPathComponent("Linked", isDirectory: true)

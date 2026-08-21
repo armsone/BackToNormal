@@ -1,4 +1,4 @@
-# BackToNormal
+# BTN
 
 개발 머신이 느려졌을 때 원인을 보여주고, 검증된 개발 자원만 사용자의 확인을 받아 정리하는 macOS 메뉴 바 앱입니다.
 
@@ -18,7 +18,7 @@
 - 종료된 정상 시뮬레이터의 데이터가 512 MiB 이상이면 기기는 남기고 앱·콘텐츠 데이터만 초기화
 - 24시간 이상 수정되지 않은 개별 DerivedData 프로젝트와 7일 이상 된 종료 상태 XCTest 기기 데이터를 휴지통으로 이동
 - 30분 이상 launchd에 재부착되어 있고 CPU 1% 이하·상주 메모리 64 MiB 이상인 명확한
-  Gradle/Kotlin 데몬·테스트 러너·브라우저 자동화·로컬 개발 서버를 메모리 정리 후보로 제안
+  Gradle/Kotlin 데몬·테스트 러너·브라우저 자동화를 메모리 정리 후보로 제안
 - 사용자가 선택한 프로세스는 실행 직전 소유자·PID·PPID·명령줄·경과 시간·자원 상태를 다시 확인하고
   정확한 PID 하나에만 `SIGTERM` 요청
 - 수동으로 찾은 정리 후보는 기본 미선택, 최종 확인, 항목별 실행 직전 재검증과 결과 기록
@@ -47,8 +47,8 @@
 
 ## 설치
 
-GitHub Releases에서 공증된 `BackToNormal-1.2.1.dmg`를 받아 열고, 앱을 Applications로
-드래그합니다. 앱을 실행하면 Dock 대신 메뉴 막대에 원상복구 아이콘이 나타납니다.
+GitHub Releases에서 공증된 `BTN-1.2.2.dmg`를 받아 열고, 앱을 Applications로
+드래그합니다. 앱을 실행하면 Dock 대신 메뉴 막대에 BTN 아이콘이 나타납니다.
 
 ## 개발 빌드와 실행
 
@@ -57,7 +57,7 @@ macOS 13(Ventura) 이상, Xcode 15+ 툴체인이 필요합니다. 서드파티 �
 ```sh
 swift build          # 빌드
 swift test           # 코어 로직 테스트 (파싱·분류·진단)
-swift run BackToNormal   # 메뉴 바에 아이콘이 나타납니다
+swift run BTN         # 메뉴 바에 아이콘이 나타납니다
 ```
 
 팀에서 프로젝트 로컬 캐시를 쓸 경우:
@@ -81,13 +81,13 @@ NOTARY_PROFILE="your-notary-profile" \
 ## 구조
 
 ```
-Sources/BackToNormalCore/   # 순수 로직 (UI·시스템 호출 없음, 단위 테스트 대상)
+Sources/BTNCore/   # 순수 로직 (UI·시스템 호출 없음, 단위 테스트 대상)
   Models.swift              #   상태·지표·프로세스 모델
   PsParser.swift            #   ps 출력 파싱 (etime 포함)
   ProcessClassifier.swift   #   개발 프로세스 분류 규칙
   ProcessCleanupPolicy.swift #  메모리 정리 후보·재검증 규칙
   DiagnosticEngine.swift    #   결정적 진단 규칙 (임계값 고정)
-Sources/BackToNormal/       # 앱 타깃
+Sources/BTN/       # 앱 타깃
   MetricsCollector.swift    #   getloadavg · sysctl · Mach host 통계 (읽기 전용)
   ProcessCollector.swift    #   /bin/ps 읽기 전용 실행
   StorageCollector.swift    #   디스크·시뮬레이터·DerivedData 용량 읽기(10분 캐시)
@@ -96,8 +96,8 @@ Sources/BackToNormal/       # 앱 타깃
   ProcessCleanupExecutor.swift # 재검증 후 정확한 PID 하나에 SIGTERM 요청
   CleanupHistory.swift      # 보호 목록·정리 이력·실제 전후 지표
   MonitorViewModel.swift    #   수집→진단→화면 연결, 자동 새로고침
-  BackToNormalApp.swift     #   MenuBarExtra + 상세 Window
+  BTNApp.swift     #   MenuBarExtra + 상세 Window
   MenuContentView.swift / DetailView.swift
-Tests/BackToNormalCoreTests/  # 파싱·분류·진단 정책 테스트
-Tests/BackToNormalTests/      # 실제 실행 경계·이력 저장 테스트
+Tests/BTNCoreTests/  # 파싱·분류·진단 정책 테스트
+Tests/BTNTests/      # 실제 실행 경계·이력 저장 테스트
 ```

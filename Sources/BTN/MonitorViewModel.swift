@@ -1,6 +1,6 @@
 import Foundation
 import SwiftUI
-import BackToNormalCore
+import BTNCore
 
 enum CleanupActivity: Equatable {
     case idle

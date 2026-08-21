@@ -3,21 +3,21 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>BackToNormal</string>
+    <string>BTN</string>
     <key>CFBundleExecutable</key>
-    <string>BackToNormal</string>
+    <string>BTN</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.nasfinder.BackToNormal</string>
     <key>CFBundleName</key>
-    <string>BackToNormal</string>
+    <string>BTN</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-	<string>1.2.1</string>
+	<string>1.2.2</string>
     <key>CFBundleVersion</key>
-	<string>10</string>
+	<string>11</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>

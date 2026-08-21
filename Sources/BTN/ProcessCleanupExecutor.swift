@@ -1,6 +1,6 @@
 import Foundation
 import Darwin
-import BackToNormalCore
+import BTNCore
 
 struct ProcessCleanupExecutionResult: Identifiable, Sendable {
     let id = UUID()

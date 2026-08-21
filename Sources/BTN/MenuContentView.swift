@@ -1,6 +1,6 @@
 import SwiftUI
 import AppKit
-import BackToNormalCore
+import BTNCore
 
 /// 메뉴 바에서 바로 보이는 요약 화면.
 struct MenuContentView: View {

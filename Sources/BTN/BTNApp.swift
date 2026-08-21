@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 @main
-struct BackToNormalApp: App {
+struct BTNApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
@@ -13,7 +13,7 @@ struct BackToNormalApp: App {
             )
         } label: {
             Image(nsImage: AppArtwork.menuBarIcon)
-                .accessibilityLabel("BackToNormal — \(appDelegate.model.diagnosis.status.koreanLabel)")
+                .accessibilityLabel("BTN — \(appDelegate.model.diagnosis.status.koreanLabel)")
         }
         .menuBarExtraStyle(.window)
     }
@@ -65,7 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "BackToNormal — 상세"
+            window.title = "BTN — 상세"
             window.contentViewController = controller
             window.contentMinSize = minimumContentSize
             window.setContentSize(preferredContentSize)

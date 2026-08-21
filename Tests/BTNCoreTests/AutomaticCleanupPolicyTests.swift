@@ -1,5 +1,5 @@
 import XCTest
-@testable import BackToNormalCore
+@testable import BTNCore
 
 final class AutomaticCleanupPolicyTests: XCTestCase {
     func testEligibilityRequiresLowRiskRecoverableUserTrashCandidate() {

@@ -1,5 +1,5 @@
 import XCTest
-@testable import BackToNormalCore
+@testable import BTNCore
 
 /// 정리 정책 테스트. 모든 관측값은 픽스처이며 실제 파일·프로세스·simctl을 건드리지 않는다.
 final class CleanupPolicyTests: XCTestCase {

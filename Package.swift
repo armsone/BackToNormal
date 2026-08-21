@@ -2,29 +2,29 @@
 import PackageDescription
 
 let package = Package(
-    name: "BackToNormal",
+    name: "BTN",
     platforms: [
         .macOS(.v13)
     ],
     targets: [
         .target(
-            name: "BackToNormalCore",
-            path: "Sources/BackToNormalCore"
+            name: "BTNCore",
+            path: "Sources/BTNCore"
         ),
         .executableTarget(
-            name: "BackToNormal",
-            dependencies: ["BackToNormalCore"],
-            path: "Sources/BackToNormal"
+            name: "BTN",
+            dependencies: ["BTNCore"],
+            path: "Sources/BTN"
         ),
         .testTarget(
-            name: "BackToNormalCoreTests",
-            dependencies: ["BackToNormalCore"],
-            path: "Tests/BackToNormalCoreTests"
+            name: "BTNCoreTests",
+            dependencies: ["BTNCore"],
+            path: "Tests/BTNCoreTests"
         ),
         .testTarget(
-            name: "BackToNormalTests",
-            dependencies: ["BackToNormal"],
-            path: "Tests/BackToNormalTests"
+            name: "BTNTests",
+            dependencies: ["BTN"],
+            path: "Tests/BTNTests"
         ),
     ]
 )

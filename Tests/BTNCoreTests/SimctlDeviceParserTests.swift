@@ -1,5 +1,5 @@
 import XCTest
-@testable import BackToNormalCore
+@testable import BTNCore
 
 /// 파서 테스트. 픽스처 JSON은 전부 테스트 안에서 만들며 실제 simctl을 호출하지 않는다.
 final class SimctlDeviceParserTests: XCTestCase {

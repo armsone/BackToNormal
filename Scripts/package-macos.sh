@@ -7,8 +7,8 @@ INFO_PLIST="$ROOT_DIR/Resources/Info.plist"
 ICON_SOURCE="$ROOT_DIR/Resources/AppIcon.png"
 BACKGROUND_SOURCE="$ROOT_DIR/Resources/DMGBackground.png"
 DIST_DIR="$ROOT_DIR/dist"
-APP_NAME=BackToNormal
-EXECUTABLE_NAME=BackToNormal
+APP_NAME=BTN
+EXECUTABLE_NAME=BTN
 APP_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")
 APP_PATH="$DIST_DIR/$APP_NAME.app"
 DMG_PATH="$DIST_DIR/$APP_NAME-$APP_VERSION.dmg"
@@ -42,7 +42,7 @@ for source in "$INFO_PLIST" "$ICON_SOURCE" "$BACKGROUND_SOURCE"; do
   fi
 done
 
-mkdir -p "$DIST_DIR" "$ROOT_DIR/.build/release-cache" "$ROOT_DIR/.build/release-config" "$ROOT_DIR/.build/release-security"
+mkdir -p "$DIST_DIR" "$ROOT_DIR/.build/btn-release-cache" "$ROOT_DIR/.build/btn-release-config" "$ROOT_DIR/.build/btn-release-security"
 WORK_DIR=$(mktemp -d "$DIST_DIR/.package.XXXXXX")
 RW_DMG="$WORK_DIR/$APP_NAME-rw.dmg"
 MOUNT_DEVICE=
@@ -58,15 +58,15 @@ trap cleanup EXIT
 build_arch() {
   local arch="$1"
   local triple="$2"
-  local scratch="$ROOT_DIR/.build/release-$arch"
+  local scratch="$ROOT_DIR/.build/btn-release-$arch"
   local module_cache="$scratch/module-cache"
 
   CLANG_MODULE_CACHE_PATH="$module_cache" SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
     swift build \
       --package-path "$ROOT_DIR" \
-      --cache-path "$ROOT_DIR/.build/release-cache" \
-      --config-path "$ROOT_DIR/.build/release-config" \
-      --security-path "$ROOT_DIR/.build/release-security" \
+      --cache-path "$ROOT_DIR/.build/btn-release-cache" \
+      --config-path "$ROOT_DIR/.build/btn-release-config" \
+      --security-path "$ROOT_DIR/.build/btn-release-security" \
       --scratch-path "$scratch" \
       --disable-sandbox \
       --triple "$triple" \
@@ -76,9 +76,9 @@ build_arch() {
   CLANG_MODULE_CACHE_PATH="$module_cache" SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
     swift build \
       --package-path "$ROOT_DIR" \
-      --cache-path "$ROOT_DIR/.build/release-cache" \
-      --config-path "$ROOT_DIR/.build/release-config" \
-      --security-path "$ROOT_DIR/.build/release-security" \
+      --cache-path "$ROOT_DIR/.build/btn-release-cache" \
+      --config-path "$ROOT_DIR/.build/btn-release-config" \
+      --security-path "$ROOT_DIR/.build/btn-release-security" \
       --scratch-path "$scratch" \
       --disable-sandbox \
       --triple "$triple" \

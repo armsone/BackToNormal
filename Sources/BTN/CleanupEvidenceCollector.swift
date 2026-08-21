@@ -1,5 +1,5 @@
 import Foundation
-import BackToNormalCore
+import BTNCore
 
 /// 사용자가 요청할 때만 정리 근거를 읽는다. 수집 실패는 nil로 보존해 정책이 fail closed 하게 한다.
 enum CleanupEvidenceCollector {

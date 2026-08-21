@@ -1,5 +1,5 @@
 import AppKit
-import BackToNormalCore
+import BTNCore
 import SwiftUI
 
 /// 상세 창: 지표, 진단 설명, 개발 관련 프로세스 목록.

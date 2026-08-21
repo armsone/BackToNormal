@@ -1,5 +1,5 @@
 import Foundation
-import BackToNormalCore
+import BTNCore
 
 struct CleanupImpactSummary: Sendable {
     let beforeMetrics: MetricsSnapshot
@@ -34,17 +34,39 @@ final class CleanupAuditStore {
     private let fileURL: URL
     private let maximumEntries: Int
 
-    init(fileURL: URL? = nil, maximumEntries: Int = 200) {
+    init(
+        fileURL: URL? = nil,
+        maximumEntries: Int = 200,
+        applicationSupportDirectory: URL? = nil
+    ) {
         if let fileURL {
             self.fileURL = fileURL
         } else {
-            let applicationSupport = FileManager.default.urls(
+            let applicationSupport = applicationSupportDirectory ?? FileManager.default.urls(
                 for: .applicationSupportDirectory,
                 in: .userDomainMask
             ).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
-            self.fileURL = applicationSupport
+            let currentURL = applicationSupport
+                .appendingPathComponent("BTN", isDirectory: true)
+                .appendingPathComponent("cleanup-history.json")
+            let legacyURL = applicationSupport
                 .appendingPathComponent("BackToNormal", isDirectory: true)
                 .appendingPathComponent("cleanup-history.json")
+            var resolvedURL = currentURL
+
+            if !FileManager.default.fileExists(atPath: currentURL.path),
+               FileManager.default.fileExists(atPath: legacyURL.path) {
+                do {
+                    try FileManager.default.createDirectory(
+                        at: currentURL.deletingLastPathComponent(),
+                        withIntermediateDirectories: true
+                    )
+                    try FileManager.default.copyItem(at: legacyURL, to: currentURL)
+                } catch {
+                    resolvedURL = legacyURL
+                }
+            }
+            self.fileURL = resolvedURL
         }
         self.maximumEntries = max(1, maximumEntries)
     }

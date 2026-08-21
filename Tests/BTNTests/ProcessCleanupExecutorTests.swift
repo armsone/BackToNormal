@@ -1,6 +1,6 @@
 import XCTest
-@testable import BackToNormal
-import BackToNormalCore
+@testable import BTN
+import BTNCore
 
 final class ProcessCleanupExecutorTests: XCTestCase {
     func testLiveTerminationAdapterStopsOnlyOwnedFixture() throws {

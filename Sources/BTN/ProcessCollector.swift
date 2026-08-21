@@ -1,5 +1,5 @@
 import Foundation
-import BackToNormalCore
+import BTNCore
 
 /// 읽기 전용 `/bin/ps` 실행으로 현재 사용자 소유 프로세스 스냅샷을 얻는다.
 /// 어떤 프로세스에도 시그널을 보내지 않는다.

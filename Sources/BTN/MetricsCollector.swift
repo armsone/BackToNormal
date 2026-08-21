@@ -1,6 +1,6 @@
 import Foundation
 import Darwin
-import BackToNormalCore
+import BTNCore
 
 /// 로컬 macOS API(getloadavg, sysctl, Mach host 통계)로만 지표를 읽는다.
 /// 관리자 권한이 필요 없고 시스템 상태를 바꾸지 않는다.
