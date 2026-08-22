@@ -192,7 +192,7 @@ if [[ "$NOTARIZE" == true ]]; then
   spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_PATH"
 fi
 
-shasum -a 256 "$DMG_PATH" > "$CHECKSUM_PATH"
+(cd "$DIST_DIR" && shasum -a 256 "${DMG_PATH:t}" > "${CHECKSUM_PATH:t}")
 printf 'Created app: %s\n' "$APP_PATH"
 printf 'Created DMG: %s\n' "$DMG_PATH"
 printf 'Created checksum: %s\n' "$CHECKSUM_PATH"
